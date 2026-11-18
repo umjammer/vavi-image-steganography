@@ -5,6 +5,8 @@
 
 # vavi-image-steganography
 
+a modification-free steganography method based on image information entropy.
+
 ## Install
 
  * [maven](https://jitpack.io/#umjammer/vavi-image-steganography)
