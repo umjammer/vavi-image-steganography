@@ -327,6 +327,11 @@ public class EntropySteganographyOp implements BufferedImageOp {
         if (destCM == null) {
             destCM = src.getColorModel();
         }
+        // preserve the source's standard image type; the ColorModel/raster constructor would
+        // yield TYPE_CUSTOM, which breaks consumers relying on BufferedImage.getType()
+        if (destCM == src.getColorModel() && src.getType() != BufferedImage.TYPE_CUSTOM) {
+            return new BufferedImage(src.getWidth(), src.getHeight(), src.getType());
+        }
         WritableRaster raster = destCM.createCompatibleWritableRaster(src.getWidth(), src.getHeight());
         return new BufferedImage(destCM, raster, destCM.isAlphaPremultiplied(), new Hashtable<>());
     }

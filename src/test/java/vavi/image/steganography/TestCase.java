@@ -59,7 +59,7 @@ class TestCase {
         BufferedImage stego = encodeOp.filter(cover, null);
         MappingKey key = encodeOp.getMappingKey();
 
-        AwtResampleOp resampleOp = new AwtResampleOp(.2, .2);
+        Lanczos3ResampleOp resampleOp = new Lanczos3ResampleOp(.2, .2);
         BufferedImage modifiedStego = resampleOp.filter(stego, null);
 
         // Decode from unmodified (or scaled/rotated) cover image and MappingKey
