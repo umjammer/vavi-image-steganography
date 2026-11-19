@@ -9,8 +9,6 @@ package vavi.image.steganography;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
-import java.awt.geom.Point2D;
-import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.nio.charset.StandardCharsets;
 import java.util.Random;
@@ -24,12 +22,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 /**
- * EntropySteganographyOpTest.
+ * EntropySteganographyTest.
  *
  * @author <a href="mailto:umjammer@gmail.com">Naohide Sano</a> (nsano)
  * @version 0.00 2026-11-18 nsano initial version <br>
  */
-class EntropySteganographyOpTest {
+class EntropySteganographyTest {
 
     /**
      * Generates a synthetic natural-like textured test image with distinct block entropy
@@ -191,46 +189,23 @@ class EntropySteganographyOpTest {
     }
 
     @Test
-    void testBufferedImageOpModificationFreeAndExactRoundTrip() {
+    void testModificationFreeAndExactRoundTrip() {
         BufferedImage cover = createTexturedImage(256, 256, BufferedImage.TYPE_INT_ARGB);
         byte[] secret = "SymmetricKeyExchange:0123456789ABCDEF".getBytes(StandardCharsets.UTF_8);
+        int[] before = cover.getRGB(0, 0, 256, 256, null, 0, 256);
 
-        // Encode via BufferedImageOp.filter
-        EntropySteganographyOp encodeOp = new EntropySteganographyOp(secret);
-        BufferedImage stego = encodeOp.filter(cover, null);
-
-        assertNotNull(stego);
-        assertEquals(cover.getWidth(), stego.getWidth());
-        assertEquals(cover.getHeight(), stego.getHeight());
-
-        // Verify 100% modification-free: every pixel in stego must equal cover
-        for (int y = 0; y < cover.getHeight(); y++) {
-            for (int x = 0; x < cover.getWidth(); x++) {
-                assertEquals(cover.getRGB(x, y), stego.getRGB(x, y),
-                        "Cover image must not be modified at (" + x + ", " + y + ")");
-            }
-        }
-
-        // Verify BufferedImageOp contract methods
-        Rectangle2D bounds = encodeOp.getBounds2D(cover);
-        assertEquals(256.0, bounds.getWidth());
-        assertEquals(256.0, bounds.getHeight());
-        Point2D pt = encodeOp.getPoint2D(new Point2D.Double(12.5, 34.5), null);
-        assertEquals(12.5, pt.getX());
-        assertEquals(34.5, pt.getY());
-
-        MappingKey mappingKey = encodeOp.getMappingKey();
+        MappingKey mappingKey = EntropySteganography.encode(cover, secret);
         assertNotNull(mappingKey);
 
-        // Decode via BufferedImageOp.filter from the unmodified cover image
-        EntropySteganographyOp decodeOp = new EntropySteganographyOp(mappingKey);
-        BufferedImage decodeOut = new BufferedImage(256, 256, BufferedImage.TYPE_INT_ARGB);
-        decodeOp.filter(stego, decodeOut);
+        // Verify 100% modification-free: encoding must not touch any pixel of the cover
+        assertArrayEquals(before, cover.getRGB(0, 0, 256, 256, null, 0, 256),
+                "Cover image must not be modified");
 
-        byte[] recovered = decodeOp.getSecret();
+        // Decode from the unmodified cover image
+        byte[] recovered = EntropySteganography.decode(cover, mappingKey);
         assertNotNull(recovered);
         assertArrayEquals(secret, recovered);
-        assertEquals(1.0, EntropySteganographyOp.calculateBitRecoveryRate(secret, recovered));
+        assertEquals(1.0, EntropySteganography.calculateBitRecoveryRate(secret, recovered));
     }
 
     @Test
@@ -239,9 +214,7 @@ class EntropySteganographyOpTest {
         BufferedImage cover1024 = createTexturedImage(1024, 1024, BufferedImage.TYPE_BYTE_GRAY);
         byte[] secretKey = "128BitSecretKey!".getBytes(StandardCharsets.UTF_8);
 
-        EntropySteganographyOp encodeOp = new EntropySteganographyOp(secretKey);
-        encodeOp.filter(cover1024, null);
-        MappingKey key = encodeOp.getMappingKey();
+        MappingKey key = EntropySteganography.encode(cover1024, secretKey);
 
         int[] targetScales = {1024, 512, 256, 128};
         for (int scale : targetScales) {
@@ -249,11 +222,9 @@ class EntropySteganographyOpTest {
                     ? cover1024
                     : scaleImage(cover1024, scale, scale);
 
-            EntropySteganographyOp decodeOp = new EntropySteganographyOp(key);
-            decodeOp.filter(scaledCover, null);
-            byte[] recovered = decodeOp.getSecret();
+            byte[] recovered = EntropySteganography.decode(scaledCover, key);
 
-            double recoveryRate = EntropySteganographyOp.calculateBitRecoveryRate(secretKey, recovered);
+            double recoveryRate = EntropySteganography.calculateBitRecoveryRate(secretKey, recovered);
             assertTrue(recoveryRate >= 0.95,
                     "Data recovery rate at scale " + scale + "x" + scale + " must exceed 95%, was: " + recoveryRate);
             assertArrayEquals(secretKey, recovered,
@@ -266,14 +237,14 @@ class EntropySteganographyOpTest {
         BufferedImage cover = createTexturedImage(512, 512, BufferedImage.TYPE_BYTE_GRAY);
         byte[] secretKey = "StegoRotationKey".getBytes(StandardCharsets.UTF_8);
 
-        MappingKey key = EntropySteganographyOp.encode(cover, secretKey);
+        MappingKey key = EntropySteganography.encode(cover, secretKey);
 
         // Small-angle rotation attack (1.5 degrees) and cardinal rotations (90, 180, 270 degrees)
         double[] angles = {1.5, 90.0, 180.0, 270.0};
         for (double angle : angles) {
             BufferedImage rotated = rotateImage(cover, angle);
-            byte[] recovered = EntropySteganographyOp.decode(rotated, key);
-            double recoveryRate = EntropySteganographyOp.calculateBitRecoveryRate(secretKey, recovered);
+            byte[] recovered = EntropySteganography.decode(rotated, key);
+            double recoveryRate = EntropySteganography.calculateBitRecoveryRate(secretKey, recovered);
             assertTrue(recoveryRate >= 0.95,
                     "Data recovery rate under " + angle + " deg rotation must exceed 95%, was: " + recoveryRate);
             assertArrayEquals(secretKey, recovered);

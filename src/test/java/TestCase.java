@@ -4,8 +4,6 @@
  * Programmed by Naohide Sano
  */
 
-package vavi.image.steganography;
-
 import java.awt.image.BufferedImage;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -16,10 +14,10 @@ import javax.imageio.ImageIO;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIf;
 
-import vavi.awt.image.resample.AwtResampleOp;
 import vavi.awt.image.resample.Lanczos3ResampleOp;
+import vavi.image.steganography.EntropySteganography;
+import vavi.image.steganography.MappingKey;
 import vavi.util.properties.annotation.Property;
 import vavi.util.properties.annotation.PropsEntity;
 
@@ -55,17 +53,13 @@ class TestCase {
         byte[] secret = "SymmetricKeyExchange".getBytes(StandardCharsets.UTF_8);
 
         // Encode (modification-free: cover image pixels are not altered)
-        EntropySteganographyOp encodeOp = new EntropySteganographyOp(secret);
-        BufferedImage stego = encodeOp.filter(cover, null);
-        MappingKey key = encodeOp.getMappingKey();
+        MappingKey key = EntropySteganography.encode(cover, secret);
 
         Lanczos3ResampleOp resampleOp = new Lanczos3ResampleOp(.2, .2);
-        BufferedImage modifiedStego = resampleOp.filter(stego, null);
+        BufferedImage modifiedCover = resampleOp.filter(cover, null);
 
         // Decode from unmodified (or scaled/rotated) cover image and MappingKey
-        EntropySteganographyOp decodeOp = new EntropySteganographyOp(key);
-        decodeOp.filter(modifiedStego, null);
-        byte[] recovered = decodeOp.getSecret();
+        byte[] recovered = EntropySteganography.decode(modifiedCover, key);
 
         assertArrayEquals(secret, recovered);
     }

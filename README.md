@@ -15,26 +15,37 @@ a modification-free steganography method based on image information entropy.
 
 ## Usage
 
+### [steganography](src/java/vavi/image/steganography)
+
 ```java
 BufferedImage cover = ImageIO.read(...);
 byte[] secret = "SymmetricKeyExchange".getBytes(StandardCharsets.UTF_8);
 
 // Encode (modification-free: cover image pixels are not altered)
-EntropySteganographyOp encodeOp = new EntropySteganographyOp(secret);
-BufferedImage stego = encodeOp.filter(cover, null);
-MappingKey key = encodeOp.getMappingKey();
+MappingKey key = EntropySteganography.encode(cover, secret);
 
 // Decode from unmodified (or scaled/rotated) cover image and MappingKey
-EntropySteganographyOp decodeOp = new EntropySteganographyOp(key);
-decodeOp.filter(stego, null);
-byte[] recovered = decodeOp.getSecret();
+byte[] recovered = EntropySteganography.decode(cover, key);
 ```
 
-- [sample](src/test/java/vavi/image/steganography/TestCase.java)
+- [sample](src/test/java/TestCase.java)
+
+### [image diff](src/java/vavi/image/diff)
+
+binary and perceptual image comparison, ported from [imgdiff](https://github.com/x1ddos/imgdiff).
+
+```java
+Differ.Result r = new PerceptualDiffer().compare(image1, image2); // or new BinaryDiffer()
+int pixels = r.pixels();         // number of different pixels
+BufferedImage diff = r.image();  // different pixels are red, others black
+```
+
+- [sample](src/test/java/vavi/image/diff/DifferTest.java)
 
 ## References
 
  * Shuang-Kui Xia and Jianbin Wu, "[A Modification-Free Steganography Method Based on Image Information Entropy](https://onlinelibrary.wiley.com/doi/10.1155/2018/6256872)", *Security and Communication Networks*, vol. 2018, Article ID 6256872, 2018.
+ * [imgdiff](https://github.com/x1ddos/imgdiff) (Apache License 2.0, Copyright 2015 Google Inc.)
 
 ## TODO
 

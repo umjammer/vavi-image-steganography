@@ -6,21 +6,14 @@
 
 package vavi.image.steganography;
 
-import java.awt.RenderingHints;
-import java.awt.geom.Point2D;
-import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
-import java.awt.image.BufferedImageOp;
-import java.awt.image.ColorModel;
-import java.awt.image.WritableRaster;
 import java.util.Arrays;
-import java.util.Hashtable;
 import java.util.Objects;
 import java.util.Random;
 
 
 /**
- * Modification-free steganography entry point implementing {@link BufferedImageOp}.
+ * Modification-free steganography utility.
  * <p>
  * Implements the Modification-Free Steganography Algorithm (MFSA) based on
  * image information entropy (16x16 grid partitioning) combined with Turbo codes,
@@ -30,26 +23,17 @@ import java.util.Random;
  * Image Information Entropy", <i>Security and Communication Networks</i>, vol. 2018,
  * Article ID 6256872, 2018. <a href="https://onlinelibrary.wiley.com/doi/10.1155/2018/6256872">DOI: 10.1155/2018/6256872</a>
  * </blockquote>
- * Because the algorithm is modification-free, {@link #filter(BufferedImage, BufferedImage)}
- * never alters any pixel of the cover image; instead, it constructs or reverses the
- * mapping relationship between the cover image's 16x16 information entropy matrix
- * and the Turbo-coded secret payload.
+ * Because the algorithm is modification-free, no pixel of the cover image is ever altered;
+ * {@link #encode(BufferedImage, byte[])} only constructs the {@link MappingKey}, the mapping
+ * relationship between the cover image's 16x16 information entropy matrix and the
+ * Turbo-coded secret payload, and {@link #decode(BufferedImage, MappingKey)} reverses it.
  * </p>
  *
  * @author <a href="mailto:umjammer@gmail.com">Naohide Sano</a> (nsano)
  * @version 0.00 2026-11-18 nsano initial version <br>
+ * @version 0.01 2026-11-19 nsano not a BufferedImageOp anymore <br>
  */
-public class EntropySteganographyOp implements BufferedImageOp {
-
-    /**
-     * Operation mode for {@link EntropySteganographyOp}.
-     */
-    public enum Mode {
-        /** Constructs a {@link MappingKey} from the cover image and secret payload. */
-        ENCODE,
-        /** Extracts the secret payload from the cover image and {@link MappingKey}. */
-        DECODE
-    }
+public final class EntropySteganography {
 
     /** Default PRNG seed for grid coordinate permutation. */
     public static final long DEFAULT_SEED = 0x2018_6256_8720_4653L;
@@ -60,136 +44,7 @@ public class EntropySteganographyOp implements BufferedImageOp {
     /** Frame header size in bytes (2 bytes payload length + 2 bytes CRC-16). */
     private static final int HEADER_BYTES = 4;
 
-    private final Mode mode;
-    private final int gridSize;
-    private final long seed;
-    private final RenderingHints hints;
-
-    private byte[] secret;
-    private MappingKey mappingKey;
-
-    /**
-     * Creates an {@link EntropySteganographyOp} in {@link Mode#ENCODE} mode with the default
-     * 16x16 grid and default seed.
-     *
-     * @param secret the secret payload bytes to map
-     */
-    public EntropySteganographyOp(byte[] secret) {
-        this(secret, ImageEntropy.DEFAULT_GRID_SIZE, DEFAULT_SEED, null);
-    }
-
-    /**
-     * Creates an {@link EntropySteganographyOp} in {@link Mode#ENCODE} mode.
-     *
-     * @param secret the secret payload bytes to map
-     * @param gridSize the grid dimension (e.g., 16 for 16x16 grid)
-     * @param seed the PRNG seed for coordinate permutation
-     * @param hints optional rendering hints
-     */
-    public EntropySteganographyOp(byte[] secret, int gridSize, long seed, RenderingHints hints) {
-        Objects.requireNonNull(secret, "secret must not be null");
-        if (gridSize <= 0) {
-            throw new IllegalArgumentException("gridSize must be positive: " + gridSize);
-        }
-        this.mode = Mode.ENCODE;
-        this.secret = Arrays.copyOf(secret, secret.length);
-        this.gridSize = gridSize;
-        this.seed = seed;
-        this.hints = hints;
-    }
-
-    /**
-     * Creates an {@link EntropySteganographyOp} in {@link Mode#DECODE} mode using the given
-     * {@link MappingKey}.
-     *
-     * @param mappingKey the mapping relationship key produced during encoding
-     */
-    public EntropySteganographyOp(MappingKey mappingKey) {
-        this(mappingKey, null);
-    }
-
-    /**
-     * Creates an {@link EntropySteganographyOp} in {@link Mode#DECODE} mode using the given
-     * {@link MappingKey} and optional {@link RenderingHints}.
-     *
-     * @param mappingKey the mapping relationship key produced during encoding
-     * @param hints optional rendering hints
-     */
-    public EntropySteganographyOp(MappingKey mappingKey, RenderingHints hints) {
-        Objects.requireNonNull(mappingKey, "mappingKey must not be null");
-        this.mode = Mode.DECODE;
-        this.mappingKey = mappingKey;
-        this.gridSize = mappingKey.getGridSize();
-        this.seed = mappingKey.getSeed();
-        this.hints = hints;
-    }
-
-    /**
-     * Performs the modification-free steganographic operation on the source image.
-     * <p>
-     * In {@link Mode#ENCODE} mode, computes the cover image's 16x16 information entropy
-     * matrix, encodes the secret payload with Turbo codes, and constructs the
-     * {@link MappingKey} (retrievable via {@link #getMappingKey()}).
-     * </p>
-     * <p>
-     * In {@link Mode#DECODE} mode, computes the received image's 16x16 information entropy
-     * matrix, reverses the mapping using the {@link MappingKey}, and decodes the secret
-     * payload via the iterative Log-MAP Turbo decoder (retrievable via {@link #getSecret()}).
-     * </p>
-     * <p>
-     * In both modes, the cover image pixels are left completely unmodified: the returned
-     * destination image is a pixel-identical copy of {@code src}.
-     * </p>
-     *
-     * @param src the source {@link BufferedImage}
-     * @param dst the destination {@link BufferedImage}, or {@code null}
-     * @return the unmodified destination {@link BufferedImage}
-     */
-    @Override
-    public BufferedImage filter(BufferedImage src, BufferedImage dst) {
-        Objects.requireNonNull(src, "src image must not be null");
-        if (dst == null) {
-            dst = createCompatibleDestImage(src, null);
-        }
-        if (dst != src) {
-            copyImageUnmodified(src, dst);
-        }
-
-        if (mode == Mode.ENCODE) {
-            this.mappingKey = encode(src, this.secret, this.gridSize, this.seed);
-        } else {
-            this.secret = decode(src, this.mappingKey);
-        }
-        return dst;
-    }
-
-    /**
-     * Returns the operation mode ({@link Mode#ENCODE} or {@link Mode#DECODE}).
-     *
-     * @return the operation mode
-     */
-    public Mode getMode() {
-        return mode;
-    }
-
-    /**
-     * Returns the {@link MappingKey} generated after {@link #filter(BufferedImage, BufferedImage)}
-     * in {@link Mode#ENCODE} mode (or supplied in {@link Mode#DECODE} mode).
-     *
-     * @return the {@link MappingKey}
-     */
-    public MappingKey getMappingKey() {
-        return mappingKey;
-    }
-
-    /**
-     * Returns the secret payload bytes (either supplied for {@link Mode#ENCODE} or
-     * extracted after {@link #filter(BufferedImage, BufferedImage)} in {@link Mode#DECODE}).
-     *
-     * @return a defensive copy of the secret payload bytes, or {@code null} if not yet decoded
-     */
-    public byte[] getSecret() {
-        return secret != null ? Arrays.copyOf(secret, secret.length) : null;
+    private EntropySteganography() {
     }
 
     /**
@@ -315,59 +170,6 @@ public class EntropySteganographyOp implements BufferedImageOp {
             matchingBits += (8 - Integer.bitCount(xor));
         }
         return (double) matchingBits / totalBits;
-    }
-
-    @Override
-    public Rectangle2D getBounds2D(BufferedImage src) {
-        return new Rectangle2D.Float(0, 0, src.getWidth(), src.getHeight());
-    }
-
-    @Override
-    public BufferedImage createCompatibleDestImage(BufferedImage src, ColorModel destCM) {
-        if (destCM == null) {
-            destCM = src.getColorModel();
-        }
-        // preserve the source's standard image type; the ColorModel/raster constructor would
-        // yield TYPE_CUSTOM, which breaks consumers relying on BufferedImage.getType()
-        if (destCM == src.getColorModel() && src.getType() != BufferedImage.TYPE_CUSTOM) {
-            return new BufferedImage(src.getWidth(), src.getHeight(), src.getType());
-        }
-        WritableRaster raster = destCM.createCompatibleWritableRaster(src.getWidth(), src.getHeight());
-        return new BufferedImage(destCM, raster, destCM.isAlphaPremultiplied(), new Hashtable<>());
-    }
-
-    @Override
-    public Point2D getPoint2D(Point2D srcPt, Point2D dstPt) {
-        if (dstPt == null) {
-            dstPt = new Point2D.Double();
-        }
-        dstPt.setLocation(srcPt.getX(), srcPt.getY());
-        return dstPt;
-    }
-
-    @Override
-    public RenderingHints getRenderingHints() {
-        return hints;
-    }
-
-    /**
-     * Copies {@code src} into {@code dst} without modifying any pixel values.
-     */
-    private static void copyImageUnmodified(BufferedImage src, BufferedImage dst) {
-        int width = Math.min(src.getWidth(), dst.getWidth());
-        int height = Math.min(src.getHeight(), dst.getHeight());
-        if (src.getType() == dst.getType() && src.getType() != BufferedImage.TYPE_CUSTOM) {
-            Object dataElements = null;
-            WritableRaster srcRaster = src.getRaster();
-            WritableRaster dstRaster = dst.getRaster();
-            for (int y = 0; y < height; y++) {
-                dataElements = srcRaster.getDataElements(0, y, width, 1, dataElements);
-                dstRaster.setDataElements(0, y, width, 1, dataElements);
-            }
-        } else {
-            int[] rgb = src.getRGB(0, 0, width, height, null, 0, width);
-            dst.setRGB(0, 0, width, height, rgb, 0, width);
-        }
     }
 
     /**
