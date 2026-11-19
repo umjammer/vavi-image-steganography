@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
  * TestCase.
  *
  * @author <a href="mailto:umjammer@gmail.com">Naohide Sano</a> (nsano)
- * @version 0.00 ${DATE} nsano initial version <br>
+ * @version 0.00 2026-11-18 nsano initial version <br>
  */
 @PropsEntity(url = "file:local.properties")
 class TestCase {
