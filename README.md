@@ -15,19 +15,17 @@ a modification-free steganography method based on image information entropy.
 
 ## Usage
 
+### [steganography](src/java/vavi/image/steganography)
+
 ```java
 BufferedImage cover = ImageIO.read(...);
 byte[] secret = "SymmetricKeyExchange".getBytes(StandardCharsets.UTF_8);
 
 // Encode (modification-free: cover image pixels are not altered)
-EntropySteganographyOp encodeOp = new EntropySteganographyOp(secret);
-BufferedImage stego = encodeOp.filter(cover, null);
-MappingKey key = encodeOp.getMappingKey();
+MappingKey key = EntropySteganography.encode(cover, secret);
 
 // Decode from unmodified (or scaled/rotated) cover image and MappingKey
-EntropySteganographyOp decodeOp = new EntropySteganographyOp(key);
-decodeOp.filter(stego, null);
-byte[] recovered = decodeOp.getSecret();
+byte[] recovered = EntropySteganography.decode(cover, key);
 ```
 
 - [sample](src/test/java/TestCase.java)
@@ -42,7 +40,6 @@ int pixels = r.pixels();         // number of different pixels
 BufferedImage diff = r.image();  // different pixels are red, others black
 ```
 
-- [sample](src/test/java/vavi/image/steganography/TestCase.java)
 - [sample](src/test/java/vavi/image/diff/DifferTest.java)
 
 ## References
