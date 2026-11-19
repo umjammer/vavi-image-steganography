@@ -5,6 +5,8 @@
 
 # vavi-image-steganography
 
+<img alt="logo" src="src/test/resources/duke_steganography.png" width="160" />
+
 a modification-free steganography method based on image information entropy.
 
 ## Install
@@ -28,8 +30,14 @@ decodeOp.filter(stego, null);
 byte[] recovered = decodeOp.getSecret();
 ```
 
+- [sample](src/test/java/vavi/image/steganography/TestCase.java)
+
 ## References
 
  * Shuang-Kui Xia and Jianbin Wu, "[A Modification-Free Steganography Method Based on Image Information Entropy](https://onlinelibrary.wiley.com/doi/10.1155/2018/6256872)", *Security and Communication Networks*, vol. 2018, Article ID 6256872, 2018.
 
 ## TODO
+
+---
+
+<sub>image designed by @umjammer, drawn by nano banana</sub>
